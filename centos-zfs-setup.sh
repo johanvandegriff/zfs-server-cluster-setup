@@ -145,8 +145,8 @@ if [[ "$answer" == n ]]; then
 fi
 
 #section 1.1 (2nd part; 1st part has to be dome manually -- see note at beginning of script)
-sudo yum check-update || error "yum check-update failed!"
-sudo yum update || error "yum update failed!"
+sudo yum check-update
+sudo yum update -y || error "yum update failed!"
 
 
 #section 1.2
@@ -156,7 +156,7 @@ sudo yum update || error "yum update failed!"
 centos_version=`cat /etc/centos-release | cut -f4 -d" " | cut -f1-2 -d. | tr . _`
 
 #install zfs-release from the zfsonlinux project
-sudo yum install -y http://download.zfsonlinux.org/epel/zfs-release.el${centos_version}.noarch.rpm || error "zfs-release failed to install!"
+sudo yum install -y http://download.zfsonlinux.org/epel/zfs-release.el${centos_version}.noarch.rpm
 
 #check the fingerprint and abort if it doesn't match
 fingerprint=`gpg --quiet --with-fingerprint /etc/pki/rpm-gpg/RPM-GPG-KEY-zfsonlinux | grep "Key"`
@@ -201,7 +201,7 @@ sudo yum install -y zfs-dracut || error "zfs-dracut failed to install!"
 #section 1.3
 #load the zfs kernel module
 #this step failed after upgrating CentOS, and the resolution was found at the link in the following error message
-modprobe zfs || error "Failed to load zfs kernel module! See: https://github.com/zfsonlinux/zfs/issues/1347"
+sudo modprobe zfs || error "Failed to load zfs kernel module! See: https://github.com/zfsonlinux/zfs/issues/1347"
 
 #check if the module was loaded
 if dmesg | egrep -i "SPL|ZFS" > /dev/null; then
@@ -249,9 +249,10 @@ for d in $selected; do
 	ids_part1="$ids_part1 /dev/disk/by-id/${id}-part1"
 done
 
-#ask for uefi or legacy
-yes_or_no "Do you want UEFI? Legacy BIOS will be used otherwise."
-uefi="$answer"
+#TODO uefi is currently disabled until some of the later commands are updated
+#yes_or_no "Do you want UEFI? Legacy BIOS will be used otherwise."
+#uefi="$answer"
+uefi=n
 
 #confirm the disks to be formatted
 yes_or_no "Format disks and create partitions? $ids (CANNOT BE UNDONE!)"
@@ -263,23 +264,23 @@ fi
 #format and partition the disks
 for id in $ids; do
 	echo -n "Formatting $id ..."
-	sgdisk --zap-all "$id" || error "error formatting disk: \"$id\""
+	sudo sgdisk --zap-all "$id" || error "error formatting disk: \"$id\""
     #the first partition will be the uefi/legacy boot partition
 	if [[ "$uefi" == "n" ]]; then
-		sgdisk -a1 -n2:34:2047  -t2:EF02 "$id" || error "error creating boot partition for disk: \"$id\""
+		sudo sgdisk -a1 -n2:34:2047  -t2:EF02 "$id" || error "error creating boot partition for disk: \"$id\""
 	else
-		sgdisk     -n3:1M:+512M -t3:EF00 "$id" || error "error creating uefi boot partition for disk: \"$id\""
+		sudo sgdisk     -n3:1M:+512M -t3:EF00 "$id" || error "error creating uefi boot partition for disk: \"$id\""
 	fi
     #the second will be managed by zfs
-	sgdisk         -n1:0:0      -t1:BF01 "$id" || error "error creating zfs partition for disk: \"$id\""
+	sudo sgdisk         -n1:0:0      -t1:BF01 "$id" || error "error creating zfs partition for disk: \"$id\""
 	echo "Done."
 done
 
 #section 2.1.2.2
 #this command creates a mirror of the 2 disks with certain properties and optimizations enabled
-command="zpool create -d -o feature@async_destroy=enabled -o feature@empty_bpobj=enabled -o feature@lz4_compress=enabled -o ashift=12 -O compression=lz4 -O atime=off $poolname mirror -f $ids_part1"
-#        zpool create -d -o feature@async_destroy=enabled -o feature@empty_bpobj=enabled -o feature@lz4_compress=enabled -o ashift=12 -O compression=lz4 rpool /dev/sda3
-#        zpool create -d -o feature@async_destroy=enabled -o feature@empty_bpobj=enabled -o feature@lz4_compress=enabled -o ashift=12 -O compression=lz4 -O copies=2 -O acltype=posixacl -O xattr=sa -O utf8only=on -O atime=off -O relatime=on rpool 
+command="sudo zpool create -d -o feature@async_destroy=enabled -o feature@empty_bpobj=enabled -o feature@lz4_compress=enabled -o ashift=12 -O compression=lz4 -O atime=off $poolname mirror -f $ids_part1"
+#        sudo zpool create -d -o feature@async_destroy=enabled -o feature@empty_bpobj=enabled -o feature@lz4_compress=enabled -o ashift=12 -O compression=lz4 rpool /dev/sda3
+#        sudo zpool create -d -o feature@async_destroy=enabled -o feature@empty_bpobj=enabled -o feature@lz4_compress=enabled -o ashift=12 -O compression=lz4 -O copies=2 -O acltype=posixacl -O xattr=sa -O utf8only=on -O atime=off -O relatime=on rpool 
 
 #confirm the command with the user
 disk_status
@@ -293,30 +294,30 @@ fi
 if $command; then
 	color green "SUCCESS: zfs pool creation succeeded!"
 else
-	error "FAILURE: zfs pool creation failed!"
+	error "FAILURE: zfs pool creation failed! This may have been caused by an already exsisting pool. Unmount it with \"sudo umount -R /$poolname/ROOT; sudo zpool export $poolname\" and re-run the script to continue."
 fi
 
 #upgrade and view the status of the pool
-zpool upgrade "$poolname" || error "Error upgrading $poolname"
-zpool status -v "$poolname" || error "Error getting status for $poolname"
-udevadm trigger || error "Error updating the udev rule"
+sudo zpool upgrade "$poolname" || error "Error upgrading $poolname"
+sudo zpool status -v "$poolname" || error "Error getting status for $poolname"
+sudo udevadm trigger || error "Error updating the udev rule"
 
 #section 2.2
 #create a dataset called ROOT
-zfs create "$poolname/ROOT" || error "Error creating ROOT dataset in $poolname"
+sudo zfs create "$poolname/ROOT" || error "Error creating ROOT dataset in $poolname"
 
 #mount the current filesystem to /mnt/tmp
-mkdir /mnt/tmp || error 'Error creating directory "/mnt/tmp"'
-mount --bind / /mnt/tmp || error 'Error mounting "/" to "/mnt/tmp"'
+sudo mkdir -p /mnt/tmp || error 'Error creating directory "/mnt/tmp"'
+sudo mount --bind / /mnt/tmp || error 'Error mounting "/" to "/mnt/tmp"'
 
 #copy the current filesystem into the ROOT dataset
-rsync -avPX /mnt/tmp/. "/$poolname/ROOT/." || error "Error copying root filesystem into ROOT dataset on $poolname"
-umount /mnt/tmp || error 'Error unmounting "/mnt/tmp"'
+sudo rsync -avPX /mnt/tmp/. "/$poolname/ROOT/." || error "Error copying root filesystem into ROOT dataset on $poolname"
+sudo umount /mnt/tmp || error 'Error unmounting "/mnt/tmp"'
 
 #section 2.3
 #comment everything out in /etc/fstab
 fstab=`cat "/$poolname/ROOT/etc/fstab"`
-echo "$fstab" | awk '{print "#" $0}' > "/$poolname/ROOT/etc/fstab" || error 'Error updating "/etc/fstab"'
+echo "$fstab" | awk '{print "#" $0}' | sudo tee "/$poolname/ROOT/etc/fstab" || error 'Error updating "/etc/fstab"'
 
 #section 2.3 (there are 2 of the same section number in the document...)
 grubfile="/$poolname/ROOT/etc/default/grub"
@@ -331,11 +332,11 @@ grubfile="/$poolname/ROOT/etc/default/grub"
 #GRUB_DISABLE_RECOVERY="true"
 
 #edit the grub config with sed
-sed -i -e 's,rhgb quiet"$,rhgb quiet boot=zfs root=ZFS='"$poolname"'/ROOT",g' "$grubfile" || error "Error editing \"$grubfile\" (1)"
-sed -i -e 's,GRUB_HIDDEN_TIMEOUT=0,#GRUB_HIDDEN_TIMEOUT=0,g' "$grubfile" || error "Error editing \"$grubfile\" (2)"
+sudo sed -i -e 's,rhgb quiet"$,rhgb quiet boot=zfs root=ZFS='"$poolname"'/ROOT",g' "$grubfile" || error "Error editing \"$grubfile\" (1)"
+sudo sed -i -e 's,GRUB_HIDDEN_TIMEOUT=0,#GRUB_HIDDEN_TIMEOUT=0,g' "$grubfile" || error "Error editing \"$grubfile\" (2)"
 to_add='GRUB_PRELOAD_MODULES="part_gpt zfs"'
 if ! grep -q "$to_add" "$grubfile"; then
-	echo "$to_add" >> "$grubfile" || error "Error editing \"$grubfile\" (3)"
+	echo "$to_add" | sudo tee -a "$grubfile" || error "Error editing \"$grubfile\" (3)"
 fi
 
 # cat "$grubfile"
@@ -351,20 +352,21 @@ fi
 #section 2.4
 #mount the important dirs to the chroot location
 for dir in proc sys dev; do
-	mount --bind "/$dir" "/$poolname/ROOT/$dir" || error "Error mounting \"/$dir\" to \"$poolname\""
+	sudo mount --bind "/$dir" "/$poolname/ROOT/$dir" || error "Error mounting \"/$dir\" to \"$poolname\""
 done
 
 #establish a quick way of running commands through chroot in the ROOT dataset
-mych="chroot /$poolname/ROOT/"
+mych="sudo chroot /$poolname/ROOT/"
 
 #create /boot/grub2 since it didn't exist and was causing an error with the next line
-$mych mkdir /boot/grub2 || error "Error creating /boot/grub2 on $poolname"
+$mych mkdir -p /boot/grub2 || error "Error creating /boot/grub2 on $poolname"
 
 #generate the grub config
 $mych grub2-mkconfig -o /boot/grub2/grub.cfg || error "Error generating grub config"
 
 #check to see if the ROOT dataset appears in grub.cfg. Currently, it doesn't and this needs to be investigated
-$mych grep ROOT /boot/grub2/grub.cfg || warning "FIXME: grub verification; could mean the system won't boot!" ###!!!should return a few lines but doesn't
+$mych grep ROOT /boot/grub2/grub.cfg || warning "FIXME: grub verification; could mean the system won't boot!"
+###!!!should return a few lines but doesn't
 
 #section 2.5 is optional, so yallready know we're skipping that
 
@@ -381,6 +383,10 @@ do
     $mych grub2-install --boot-directory=/boot $disk || error "Error installing grub to disk \"$disk\""
 done
 
+#!!!!! current error:
+#Installing for i386-pc platform.
+#grub2-install: error: unknown filesystem.
+
 #section 2.6.3
 #no need to do this for later versions of centos:
 #$mych echo 'add_dracutmodules+="zfs"' >> /etc/dracut.conf
@@ -392,14 +398,14 @@ $mych dracut -f -v /boot/initramfs-$(uname -r).img $(uname -r) || error "Error a
 
 #unmount the important dirs
 for dir in proc sys dev; do
-	umount "/$poolname/ROOT/$dir" || error "error unmounting /$dir from $poolname"
+	sudo umount "/$poolname/ROOT/$dir" || error "error unmounting /$dir from $poolname"
 done
 
 #section 2.7
-rm /etc/zfs/zpool.cache || error "Error removing zpool.cache!"
+$mych rm /etc/zfs/zpool.cache -f || error "Error removing zpool.cache!"
 
 #section 2.8
-yes_or_no "Do you want to reboot now to complete the installation?"
+yes_or_no "Do you want to reboot now to complete the installation? Be sure to select one of the devices with zfs to boot from when starting back up."
 if [[ "$answer" == y ]]; then
-    reboot
+    sudo reboot
 fi
