@@ -137,6 +137,7 @@ disk_status() {
 
 
 
+warning "This script did not work on CentOS 7.6 (grub2-install: error: unknown filesystem.) and we have moved over to Ubuntu 18.04 using the other script, which works great."
 #TODO automatically check if the system is installed or live
 #ask if the user has installed the system
 yes_or_no "Are you running this script from an installation of CentOS? (NOT a live USB!!)"
@@ -294,7 +295,9 @@ fi
 if $command; then
 	color green "SUCCESS: zfs pool creation succeeded!"
 else
-	error "FAILURE: zfs pool creation failed! This may have been caused by an already exsisting pool. Unmount it with \"sudo umount -R /$poolname/ROOT; sudo zpool export $poolname\" and re-run the script to continue."
+    #retrieve the name of the offending pool(s)
+    poolname2=`zpool list | tail -n +2 | cut -d' ' -f1`
+	error "FAILURE: zfs pool creation failed! This may have been caused by an already exsisting pool. Unmount it with \"sudo umount -R /$poolname2/ROOT; sudo zpool export $poolname2\" and re-run the script to continue."
 fi
 
 #upgrade and view the status of the pool
@@ -361,26 +364,26 @@ mych="sudo chroot /$poolname/ROOT/"
 #create /boot/grub2 since it didn't exist and was causing an error with the next line
 $mych mkdir -p /boot/grub2 || error "Error creating /boot/grub2 on $poolname"
 
+#link the devices from /dev/disk/by-id to just /dev to allow grub to find them
+$mych ln -s /dev/disk/by-id/* /dev/ -i || error "Error linking disks from /dev/disk/by-id to /dev"
+
+#$mych export ZPOOL_VDEV_NAME_PATH=YES
+
 #generate the grub config
 $mych grub2-mkconfig -o /boot/grub2/grub.cfg || error "Error generating grub config"
 
 #check to see if the ROOT dataset appears in grub.cfg. Currently, it doesn't and this needs to be investigated
-$mych grep ROOT /boot/grub2/grub.cfg || warning "FIXME: grub verification; could mean the system won't boot!"
+$mych grep ROOT /boot/grub2/grub.cfg || warning "FIXME: grub install not verified; could mean the system won't boot!"
 ###!!!should return a few lines but doesn't
 
 #section 2.5 is optional, so yallready know we're skipping that
-
-#section 2.6
-#$mych export ZPOOL_VDEV_NAME_PATH=YES
-#link the devices from /dev/disk/by-id to just /dev to avoid a later error
-$mych ln -s /dev/disk/by-id/* /dev/ -i || error "Error linking disks from /dev/disk/by-id to /dev"
 
 #section 2.6.2 (again, this is for raidz2 but it works for mirroring too)
 #install grub to each of the disks in the array, being careful to use /dev/<device> to avoid a bug/error
 ids_dev=`echo "$ids" | sed "s,/disk/by-id,,g"`
 for disk in $ids_dev
 do
-    $mych grub2-install --boot-directory=/boot $disk || error "Error installing grub to disk \"$disk\""
+    $mych grub2-install --boot-directory=/boot $disk || warning "FIXME: Error installing grub to disk \"$disk\""
 done
 
 #!!!!! current error:
