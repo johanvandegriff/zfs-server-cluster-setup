@@ -15,11 +15,15 @@ ufw allow 3389/tcp || error "Error allowing port 3389 for xrdp"
 # restart xrdp 
 /etc/init.d/xrdp restart || error "Error restarting xrdp"
 
-apt install -y zsh tmux xclip htop glances openssh-server git gnome-disk-utility gparted gsmartcontrol pv iotop meld baobab || error "Error installing packages"
+apt install -y zsh tmux xclip htop glances openssh-server git gnome-disk-utility gparted gsmartcontrol pv iotop meld baobab arp-scan zenmap || error "Error installing packages"
 
 ufw allow 22/tcp || error "Error allowing firewall port 22 for ssh"
 
 echo y | ufw enable || error "Error enabling the firewall"
+
+color green "oh-my-zsh will install. You will need to enter your password, then wait for it to install and quit out of the zsh shell with Ctrl-D to return to this script."
+echo "Press ENTER to continue"
+read a
 
 sudo -u $SUDO_USER sh -c "$(wget https://raw.githubusercontent.com/robbyrussell/oh-my-zsh/master/tools/install.sh -O -)"
 
