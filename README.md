@@ -7,7 +7,7 @@ A set of installation and setup scripts for creating a cluster of CentOS servers
 Install CentOS with a ZFS filesystem. Should be run from a CentOS installation, not a live USB. See the beginning of the script for instructions.
 
 ### ubuntu-zfs-setup.sh
-Install Ubuntu with a ZFS filesystem. Should be run from a live USB (unlike the CentOS script).
+Install Ubuntu with a ZFS filesystem. Should be run from a live USB (unlike the CentOS script) of the **desktop version** of Ubuntu.
 
 ### ubuntu-admin-tools.sh
 Install XRDP remote desktop, ssh access, firewall, utility packages, and xfce desktop settings.

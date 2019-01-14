@@ -21,7 +21,7 @@ ufw allow 22/tcp || error "Error allowing firewall port 22 for ssh"
 
 echo y | ufw enable || error "Error enabling the firewall"
 
-sh -c "$(wget https://raw.githubusercontent.com/robbyrussell/oh-my-zsh/master/tools/install.sh -O -)"
+sudo -u $SUDO_USER sh -c "$(wget https://raw.githubusercontent.com/robbyrussell/oh-my-zsh/master/tools/install.sh -O -)"
 
 find_zfs_pools
 zfs snapshot $poolfound/ROOT/ubuntu-1@xrdp-installed || error "Error making zfs snapshot (xrdp-installed)"
