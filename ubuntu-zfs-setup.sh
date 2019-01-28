@@ -94,7 +94,7 @@ zfs create -V 10G $poolname/ubuntu-temp || error "Error creating temporary datas
 
 
 cat << EOF
-1. Choose any options you wish until you get to the 'Installation Type' screen.
+1. Choose any options you wish until you get to the 'Installation Type' screen. (For server applications, you may want to select the minimal installation)
 2. Select 'Erase disk and install Ubuntu' and click 'Continue'.
 3. Change the 'Select drive:' dropdown to '/dev/zd0 - 10.7 GB Unknown' and click 'Install Now'.
 4. A popup summarizes your choices and asks 'Write the changes to disks?". Click 'Continue'.
