@@ -132,5 +132,5 @@ fi
 yes_or_no "Attempt to create zfs snapshot (post-k8s-install)?"
 if [[ "$answer" == "y" ]]; then
     find_zfs_pools
-    zfs snapshot "$poolfound"/ROOT/ubuntu-1@post-k8s-install || error "Error creating zfs snapshot (pre)"
+    zfs snapshot "$poolfound"/ROOT/ubuntu-1@post-k8s-install || error "Error creating zfs snapshot (post)"
 fi
