@@ -27,6 +27,12 @@ fi
 color green "Press ENTER to continue."
 read a
 
+yes_or_no "Attempt to create zfs snapshot (pre-k8s-install)?"
+if [[ "$answer" == "y" ]]; then
+    find_zfs_pools
+    zfs snapshot "$poolfound"/ROOT/ubuntu-1@pre-k8s-install || error "Error creating zfs snapshot (pre)"
+fi
+
 yes_or_no "Is this the master node? The master node must be initialized before all the other nodes."
 master="$answer"
 
@@ -121,4 +127,10 @@ More info: https://kubernetes.io/docs/setup/independent/create-cluster-kubeadm/#
     read command
     $command || error "Error adding node to kubeadm cluster"
     color green "Node added. Check 'kubectl get nodes' on the master node to see it"
+fi
+
+yes_or_no "Attempt to create zfs snapshot (post-k8s-install)?"
+if [[ "$answer" == "y" ]]; then
+    find_zfs_pools
+    zfs snapshot "$poolfound"/ROOT/ubuntu-1@post-k8s-install || error "Error creating zfs snapshot (pre)"
 fi
