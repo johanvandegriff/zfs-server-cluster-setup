@@ -73,12 +73,23 @@ for d in $selected; do
         if [[ "$answer" == y ]]; then
             color yellow "Continuing with the alternate name."
             id="/dev/$d"
+            if [[ "$d" == "nvme"* ]]; then
+                id_part1="/dev/${d}p1"
+            elif [[ "$d" == "sd"? ]]; then
+                id_part1="/dev/${d}1"
+            else
+                id_part1="/dev/${d}1"
+                warning "disk name format not recognized: \"${id}\" Assuming \"${id_part1}\" is 1st partition"
+            fi
         else
             error "disk not found by ID and user selected not to identify it by the alternate name, so the disk could not be assigned a name"
         fi
+    else
+        id="/dev/disk/by-id/$id"
+        id_part1="/dev/disk/by-id/${id}-part1"
     fi
-    ids="$ids /dev/disk/by-id/$id"
-    ids_part1="$ids_part1 /dev/disk/by-id/${id}-part1"
+    ids="$ids $id"
+    ids_part1="$ids_part1 $id_part1"
 done
 
 
