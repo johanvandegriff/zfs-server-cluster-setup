@@ -52,7 +52,7 @@ fi
 disk_status
 echo "$disks"
 color green "Enter which disk(s) you want to use separated by spaces. e.g. \"sdb sdc\""
-color orange "WARNING: at this time, the only supported array type is a mirror with 2 disks. The script needs to be modified for different configurations. (You can add additional mirrors later.) Please enter 2 disks."
+color orange "WARNING: at this time, the only supported array types are single disks and mirrors with 2 disks. The script needs to be modified for different configurations. (You can add additional disks or mirrors later.) Please enter 1 or 2 disks."
 read selected
 
 #TODO add support for configs other than single disks or mirrors of just 2 disks
@@ -66,12 +66,19 @@ fi
 ids=
 ids_part1=
 for d in $selected; do
-	id=`echo "$disks" | grep "${d}$" | head -1 | awk '{print $1}'`
-	if [[ -z "$id" ]]; then
-		error "FAILURE: no /dev/disk/by-id found for drive \"$d\"!"
-	fi
-	ids="$ids /dev/disk/by-id/$id"
-	ids_part1="$ids_part1 /dev/disk/by-id/${id}-part1"
+    id=`echo "$disks" | grep "${d}$" | head -1 | awk '{print $1}'`
+    if [[ -z "$id" ]]; then
+        warning "no /dev/disk/by-id found for drive \"$d\"!"
+        yes_or_no "Continue with the alternate name for the disk (/dev/$d)? This could cause problems if the name changes in the future. Storage built-in to a system should not change name."
+        if [[ "$answer" == y ]]; then
+            color yellow "Continuing with the alternate name."
+            id="/dev/$d"
+        else
+            error "disk not found by ID and user selected not to identify it by the alternate name, so the disk could not be assigned a name"
+        fi
+    fi
+    ids="$ids /dev/disk/by-id/$id"
+    ids_part1="$ids_part1 /dev/disk/by-id/${id}-part1"
 done
 
 
