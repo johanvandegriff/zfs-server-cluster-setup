@@ -97,7 +97,7 @@ if [[ "$num_selected" == 1 ]]; then
     yes_or_no "Do you want to store 2 copies of each file for redundancy and fault tolerance?"
     if [[ "$answer" == y ]]; then
         #this creates a zfs pool with a single disk with 2 copies of each file
-        command="zpool create -f -o ashift=12 -O atime=off -O compression=lz4 -O normalization=formD -O recordsize=1M -O xattr=sa copies=2 $poolname $ids"
+        command="zpool create -f -o ashift=12 -O atime=off -O compression=lz4 -O normalization=formD -O recordsize=1M -O xattr=sa -O copies=2 $poolname $ids"
     else
         #this creates a zfs pool with a single disk and only 1 copy of each file
         command="zpool create -f -o ashift=12 -O atime=off -O compression=lz4 -O normalization=formD -O recordsize=1M -O xattr=sa $poolname $ids"
