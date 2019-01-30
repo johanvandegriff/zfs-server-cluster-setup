@@ -28,7 +28,7 @@ fi
 
 ubuntu_release=`lsb_release -a|grep "Release:" | awk '{print $2}'`
 if [[ "$ubuntu_release" == 16.04 ]]; then
-    color green "This script has been tested with Ubuntu \"16.04\""
+    warning "This script has been tested with Ubuntu \"16.04\" but fails"
     zfsutils="zfsutils-linux"
 elif [[ "$ubuntu_release" == 18.04 ]]; then
     color green "This script has been tested with Ubuntu \"18.04\""
@@ -136,6 +136,7 @@ sudo udevadm trigger || error "Error triggering the udev rule"
 zfs create -V 10G $poolname/ubuntu-temp || error "Error creating temporary dataset in $poolname"
 
 #show the user some steps to take manually
+color green "Follow the steps below manually:"
 cat << EOF
 1. Choose any options you wish until you get to the 'Installation Type' screen. (For server applications, you may want to select the minimal installation)
 2. Select 'Erase disk and install Ubuntu' and click 'Continue'.
