@@ -26,8 +26,20 @@ if [[ "$1" == "--cleanup" ]]; then
     exit
 fi
 
+ubuntu_release=`lsb_release -a|grep "Release:" | awk '{print $2}'`
+if [[ "$ubuntu_release" == 16.04 ]]; then
+    color green "This script has been tested with Ubuntu \"16.04\""
+    zfsutils="zfsutils-linux"
+elif [[ "$ubuntu_release" == 18.04 ]]; then
+    color green "This script has been tested with Ubuntu \"18.04\""
+    zfsutils="zfsutils"
+else
+    warning "This script has not been tested with Ubuntu \"$ubuntu_release\""
+    zfsutils="zfsutils"
+fi
+
 apt update || error "Error retrieving latest package lists (apt update)"
-apt install -y zfsutils || error "Error installing zfsutils package"
+apt install -y $zfsutils || error "Error installing zfsutils package"
 
 #ask for the name of the pool and check to make sure it is valid
 color green "What do you want to name the pool?"
