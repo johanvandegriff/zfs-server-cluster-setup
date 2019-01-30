@@ -10,6 +10,7 @@
 . `dirname "$0"`/install-common.sh || exit 1
 
 
+#this should be executed after the reboot to remove the temporary datasets, create a snapshot, and update the system
 if [[ "$1" == "--cleanup" ]]; then
     poolname2=`zpool list | tail -n +2 | cut -d' ' -f1`
     numpools=`echo $poolname2 | wc -l`
@@ -29,7 +30,7 @@ apt update || error "Error retrieving latest package lists (apt update)"
 apt install -y zfsutils || error "Error installing zfsutils package"
 
 #ask for the name of the pool and check to make sure it is valid
-echo "What do you want to name the pool?"
+color green "What do you want to name the pool?"
 read poolname
 if ( echo "$poolname" | grep -q ' ' ) || [[ -z "$poolname" ]]; then
 	error "FAILURE: pool name contains spaces or is empty: \"$poolname\". The convention is lowercase letters only, no spaces."
@@ -38,15 +39,15 @@ fi
 #show user a choice of disk and get disk info; see function defined above
 disk_status
 echo "$disks"
-echo "Enter which disk(s) you want to use separated by spaces. e.g. \"sdb sdc\""
+color green "Enter which disk(s) you want to use separated by spaces. e.g. \"sdb sdc\""
 color orange "WARNING: at this time, the only supported array type is a mirror with 2 disks. The script needs to be modified for different configurations. (You can add additional mirrors later.) Please enter 2 disks."
 read selected
 
-#TODO add support for configs other than mirror of just 2 disks
-#make sure only 2 disks were selected
+#TODO add support for configs other than single disks or mirrors of just 2 disks
+#make sure only 1 or 2 disks were selected
 num_selected=`echo "$selected" | wc -w`
-if [[ "$num_selected" -ne 2 ]]; then
-    error "Only mirrors of exactly 2 disks are supported, but you entered $num_selected disks."
+if [[ "$num_selected" -ne 1 ]] && [[ "$num_selected" -ne 2 ]]; then
+    error "Only single disks and mirrors of 2 disks are supported, but you entered $num_selected disks."
 fi
 
 #loop through the disks the user selected and find them by id
@@ -62,8 +63,22 @@ for d in $selected; do
 done
 
 
-#this command creates a mirror of the 2 disks with certain properties and optimizations enabled
-command="sudo zpool create -d -o feature@async_destroy=enabled -o feature@empty_bpobj=enabled -o feature@lz4_compress=enabled -o ashift=12 -O compression=lz4 -O atime=off $poolname mirror -f $ids" #$ids_part1"
+if [[ "$num_selected" == 1 ]]; then
+    yes_or_no "Do you want to store 2 copies of each file for redundancy and fault tolerance?"
+    if [[ "$answer" == y ]]; then
+        #this creates a zfs pool with a single disk with 2 copies of each file
+        command="zpool create -f -o ashift=12 -O atime=off -O compression=lz4 -O normalization=formD -O recordsize=1M -O xattr=sa copies=2 $poolname $ids"
+    else
+        #this creates a zfs pool with a single disk and only 1 copy of each file
+        command="zpool create -f -o ashift=12 -O atime=off -O compression=lz4 -O normalization=formD -O recordsize=1M -O xattr=sa $poolname $ids"
+    fi
+elif [[ "$num_selected" == 2 ]]; then
+    #this command creates a mirror of the 2 disks with certain properties and optimizations enabled
+    command="sudo zpool create -d -o feature@async_destroy=enabled -o feature@empty_bpobj=enabled -o feature@lz4_compress=enabled -o ashift=12 -O compression=lz4 -O atime=off $poolname mirror -f $ids" #$ids_part1"
+else
+    error "Invalid number of disks: $num_selected"
+fi
+
 
 disk_status
 color orange "$command"
@@ -84,15 +99,13 @@ fi
 #upgrade and view the status of the pool
 sudo zpool upgrade "$poolname" || error "Error upgrading $poolname"
 sudo zpool status -v "$poolname" || error "Error getting status for $poolname"
-sudo udevadm trigger || error "Error updating the udev rule"
+sudo udevadm trigger || error "Error triggering the udev rule"
 
 
-#zpool create -f -o ashift=12 -O atime=off -O compression=lz4 -O normalization=formD -O recordsize=1M -O xattr=sa $poolname /dev/disk/by-id/ata-ST9999999999_10000000
-
-
+#create a temporary pool to install to
 zfs create -V 10G $poolname/ubuntu-temp || error "Error creating temporary dataset in $poolname"
 
-
+#show the user some steps to take manually
 cat << EOF
 1. Choose any options you wish until you get to the 'Installation Type' screen. (For server applications, you may want to select the minimal installation)
 2. Select 'Erase disk and install Ubuntu' and click 'Continue'.
@@ -104,23 +117,23 @@ EOF
 
 ubiquity --no-bootloader || error "Error with graphical installer"
 
-echo "Press ENTER to continue"
+color green "Press ENTER after you have completed the above steps to continue"
 read a
 
 zfs create $poolname/ROOT || error "Error creating ROOT dataset in $poolname"
 zfs create $poolname/ROOT/ubuntu-1 || error "Error creating ROOT/ubuntu-1 dataset in $poolname"
 rsync -avPX /target/. /$poolname/ROOT/ubuntu-1/. || error "Error copying files to new dataset"
 
-
+#mount important directories to the chroot environment
 for d in proc sys dev
 do
     mount --bind /$d /$poolname/ROOT/ubuntu-1/$d || error "Error mounting $d to the zfs filesystem for chroot"
 done
 
+#running commands inside the chroot
 mych="chroot /$poolname/ROOT/ubuntu-1"
 
 cp /etc/resolv.conf /$poolname/ROOT/ubuntu-1/etc/resolv.conf 
-#$mych echo "nameserver 8.8.8.8" | tee -a /etc/resolv.conf
 $mych apt update || error "Error retrieving package lists (in chroot)"
 $mych apt install -y zfs-initramfs || error "Error installing zfs-initramfs (in chroot)"
 
@@ -129,12 +142,11 @@ fstab_file="/$poolname/ROOT/ubuntu-1/etc/fstab"
 fstab_contents=`cat $fstab_file`
 echo "$fstab_contents" | awk '{print "#" $0}' | sudo tee "$fstab_file" || error "Error updating \"$fstab_file\""
 
-#$mych nano /etc/fstab         ## comment out the lines for the mountpoint "/" and "/swapfile" and exit
-
 $mych rm /swapfile || error "Error removing swapfile (in chroot)"
 
 $mych update-grub || error "Error updating grub (in chroot)"
 
+#format the disks and install grub to them so all of them are bootable
 for disk in $ids
 do
     $mych sgdisk -a1 -n2:512:2047 -t2:EF02 $disk || error "Error formatting $disk"
@@ -149,5 +161,4 @@ umount /target    || error "Error unmounting /target"
 zpool export $poolname   || error "Error exporting zfs pool"
 #shutdown -r 0 || error "Error shutting down"
 
-echo "reboot now to finish installation"
-
+color green "Installation was successful! REBOOT NOW, then run this script with the --cleanup flag to remove the temporary files: '$0 --cleanup'"
