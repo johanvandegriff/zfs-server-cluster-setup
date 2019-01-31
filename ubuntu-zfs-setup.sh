@@ -28,7 +28,7 @@ fi
 
 ubuntu_release=`lsb_release -a|grep "Release:" | awk '{print $2}'`
 if [[ "$ubuntu_release" == 16.04 ]]; then
-    warning "This script has been tested with Ubuntu \"16.04\" but fails"
+    color green "This script has been tested with Ubuntu \"16.04\""
     zfsutils="zfsutils-linux"
 elif [[ "$ubuntu_release" == 18.04 ]]; then
     color green "This script has been tested with Ubuntu \"18.04\""
@@ -143,10 +143,15 @@ cat << EOF
 3. Change the 'Select drive:' dropdown to '/dev/zd0 - 10.7 GB Unknown' and click 'Install Now'.
 4. A popup summarizes your choices and asks 'Write the changes to disks?". Click 'Continue'.
 5. At this point continue through the installer normally.
-6. Finally, a message comes up 'Installation Complete'. Click the 'Continue Testing'.
 EOF
 
-ubiquity --no-bootloader || error "Error with graphical installer"
+if [[ "$ubuntu_release" == 16.04 ]]; then
+    echo "6. Finally, a message comes up 'Installation Complete'. DO NOT CLICK ON ANYTHING -- Leave the pop-up window open and continue this script"
+    ubiquity --no-bootloader || error "Error with graphical installer &"
+else
+    echo "6. Finally, a message comes up 'Installation Complete'. Click the 'Continue Testing'."
+    ubiquity --no-bootloader || error "Error with graphical installer"
+fi
 
 color green "Press ENTER after you have completed the above steps to continue"
 read a
@@ -173,7 +178,7 @@ fstab_file="/$poolname/ROOT/ubuntu-1/etc/fstab"
 fstab_contents=`cat $fstab_file`
 echo "$fstab_contents" | awk '{print "#" $0}' | sudo tee "$fstab_file" || error "Error updating \"$fstab_file\""
 
-$mych rm /swapfile || error "Error removing swapfile (in chroot)"
+$mych rm /swapfile || warning "Error removing swapfile (in chroot)"
 
 $mych update-grub || error "Error updating grub (in chroot)"
 
