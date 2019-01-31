@@ -4,7 +4,7 @@ A set of installation and setup scripts for creating a cluster of CentOS servers
 ## DeSCRIPTions
 
 ### ubuntu-zfs-setup.sh
-Install Ubuntu with a ZFS filesystem. Should be run from a live USB (unlike the CentOS script) of the **desktop version** of Ubuntu.
+Install Ubuntu with a ZFS filesystem. Should be run from a live USB (unlike the CentOS script) of the **desktop version** of Ubuntu. Tested and working with Ubuntu 16.04 and Ubuntu 18.04. Based on [this wiki article](https://github.com/zfsonlinux/pkg-zfs/wiki/HOWTO-install-Ubuntu-18.04-to-a-Whole-Disk-Native-ZFS-Root-Filesystem-using-Ubiquity-GUI-installer).
 
 ### ubuntu-admin-tools.sh
 Install XRDP remote desktop, ssh access, firewall, utility packages, and xfce desktop settings.
