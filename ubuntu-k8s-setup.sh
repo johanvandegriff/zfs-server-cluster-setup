@@ -94,9 +94,12 @@ if [[ "$master" == y ]]; then
     color yellow "IMPORTANT: Copy the \"kubeadm join\" command above to a secure location (e.g. a password manager such as KeepassXC). You will need it when you add worker nodes to the cluster later."
     color green "Press ENTER when done."
     read a
-    mkdir -p $HOME/.kube || error "Error creating ~/.kube"
-    cp -i /etc/kubernetes/admin.conf $HOME/.kube/config || error "Error copying admin configuration to ~/.kube/"
-    chown $(id -u):$(id -g) $HOME/.kube/config || error "Error changing ownership of ~/kube/"
+    user_name="$SUDO_USER"
+    user_group=$(getent group $user_name | cut -f1 -d:)
+    user_home=$(getent passwd $user_name | cut -f6 -d:)
+    mkdir -p $user_home/.kube || error "Error creating ~/.kube"
+    cp -i /etc/kubernetes/admin.conf $user_home/.kube/config || error "Error copying admin configuration to ~/.kube/"
+    chown -R $user_name:$user_group $user_home/.kube || error "Error changing ownership of ~/kube/"
     
     #for the pod network, I selected weave
     #this module is needed for the iptables command to work: https://serverfault.com/questions/697942/centos-6-elrepo-kernel-bridge-issues
