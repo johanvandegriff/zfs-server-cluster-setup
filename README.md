@@ -10,7 +10,7 @@ Install Ubuntu with a ZFS filesystem. Should be run from a live USB (unlike the 
 Install XRDP remote desktop, ssh access, firewall, utility packages, and xfce desktop settings.
 
 ### ubuntu-k8s-setup.sh
-Install kubernetes using kubeadm to a node, either the master node or a worker node. The master node must be installed first, which will generate a "kubeadm join" command to be run on the worker nodes.
+Install [kubernetes](https://kubernetes.io/) using kubeadm to a node, either the master node or a worker node. The master node must be installed first, which will generate a "kubeadm join" command to be run on the worker nodes.
 
 ### install-common.sh
 Common functions for all the scripts, such as output text coloring, error messages, and disk utilities
@@ -21,10 +21,6 @@ This script is not working and I have switched to Ubuntu for the setup. If you h
 
 ## Future Scripts:
 * backup-script-setup.sh -- Install a cron job that backs up the ZFS pool with [syncoid](https://github.com/jimsalterjrs/sanoid) to another location specified by the user.
-* k8s-install.sh -- install kubectl, kubeadm, and kubefed packages from [kubernetes](https://kubernetes.io/).
-* master-node-setup.sh -- set up a machine as a master node of a cluster and join a federated group of clusters in different locations using kubefed.
-* worker-node-setup.sh -- set up a machine as a worker node and join the local cluster with kubeadm as specified by the master node.
-* node-setup-common.sh -- a script that holds all the common elements between the worker and master nodes. This should not be called directly, the other scripts will call it as needed.
 
 ## Other Ideas
 * config files to further automate the setup and to provide the same options to multiple scripts
