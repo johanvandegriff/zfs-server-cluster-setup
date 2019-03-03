@@ -45,22 +45,65 @@ apt install -y $zfsutils || error "Error installing zfsutils package"
 color green "What do you want to name the pool?"
 read poolname
 if ( echo "$poolname" | grep -q ' ' ) || [[ -z "$poolname" ]]; then
-	error "FAILURE: pool name contains spaces or is empty: \"$poolname\". The convention is lowercase letters only, no spaces."
+    error "FAILURE: pool name contains spaces or is empty: \"$poolname\". The convention is lowercase letters only, no spaces."
 fi
 
 #show user a choice of disk and get disk info; see function defined above
 disk_status
 echo "$disks"
+color green "Which zpool vdev type do you want? You can add additional vdevs of any type later.
+1. single disk
+2. mirror of 2 disks
+3. raidz (single disk parity) with 3 or more disks"
+#TODO: add support for double or triple parity
+prompt="[1-3]"
+answer=
+while [[ -z "$answer" ]]; do #repeat until a valid answer is given
+    read -p "$prompt" -n 1 response #read 1 char
+    case "$response" in
+        1|single)answer=single
+                 num_disks=1
+                 num_disks_limit="="
+                 num_disks_limit_disp=;;
+        2|mirror)answer=mirror
+                 num_disks=2
+                 num_disks_limit="="
+                 num_disks_limit_disp=;;
+        3|raidz)answer=raidz
+                 num_disks=3
+                 num_disks_limit="+"
+                 num_disks_limit_disp="or more ";;
+        *)color yellow "
+Enter a number from 1 to 3.";;
+    esac
+done
+echo
+
+vdev_type="$answer"
+
+echo "$disks"
 color green "Enter which disk(s) you want to use separated by spaces. e.g. \"sdb sdc\""
-color orange "WARNING: at this time, the only supported array types are single disks and mirrors with 2 disks. The script needs to be modified for different configurations. (You can add additional disks or mirrors later.) Please enter 1 or 2 disks."
-read selected
+color green "You have selected \"$vdev_type\" as your vdev type. Please enter $num_disks$num_disks_limit_disp disks."
+while true; do
+    read selected
+    #make sure the correct number of disks was entered
+    num_selected=`echo "$selected" | wc -w`
+    if [[ "$num_disks_limit" == "+" ]]; then
+        if [[ "$num_selected" -gt "$num_disks" ]]; then
+            break
+        else
+            color yellow "Please enter at least $num_disks. (You entered ${num_selected}.)"
+        fi
+    else
+        if [[ "$num_selected" -eq "$num_disks" ]]; then
+            break
+        else
+            color yellow "Please enter exactly $num_disks. (You entered ${num_selected}.)"
+        fi
+    fi
+done
 
 #TODO add support for configs other than single disks or mirrors of just 2 disks
-#make sure only 1 or 2 disks were selected
-num_selected=`echo "$selected" | wc -w`
-if [[ "$num_selected" -ne 1 ]] && [[ "$num_selected" -ne 2 ]]; then
-    error "Only single disks and mirrors of 2 disks are supported, but you entered $num_selected disks."
-fi
 
 #loop through the disks the user selected and find them by id
 ids=
@@ -93,7 +136,7 @@ for d in $selected; do
 done
 
 
-if [[ "$num_selected" == 1 ]]; then
+if [[ "$vdev_type" == "single" ]]; then
     yes_or_no "Do you want to store 2 copies of each file for redundancy and fault tolerance?"
     if [[ "$answer" == y ]]; then
         #this creates a zfs pool with a single disk with 2 copies of each file
@@ -102,28 +145,30 @@ if [[ "$num_selected" == 1 ]]; then
         #this creates a zfs pool with a single disk and only 1 copy of each file
         command="zpool create -f -o ashift=12 -O atime=off -O compression=lz4 -O normalization=formD -O recordsize=1M -O xattr=sa $poolname $ids"
     fi
-elif [[ "$num_selected" == 2 ]]; then
+elif [[ "$vdev_type" == "mirror" ]]; then
     #this command creates a mirror of the 2 disks with certain properties and optimizations enabled
-    command="sudo zpool create -d -o feature@async_destroy=enabled -o feature@empty_bpobj=enabled -o feature@lz4_compress=enabled -o ashift=12 -O compression=lz4 -O atime=off $poolname mirror -f $ids" #$ids_part1"
+    command="sudo zpool create -d -o feature@async_destroy=enabled -o feature@empty_bpobj=enabled -o feature@lz4_compress=enabled -o ashift=12 -O compression=lz4 -O atime=off $poolname mirror -f $ids"
+elif [[ "$vdev_type" == "raidz" ]]; then
+    #this command creates a raidz of the 3+ disks with certain properties and optimizations enabled
+    command="sudo zpool create -d -o feature@async_destroy=enabled -o feature@empty_bpobj=enabled -o feature@lz4_compress=enabled -o ashift=12 -O compression=lz4 -O atime=off $poolname raidz -f $ids"
 else
     error "Invalid number of disks: $num_selected"
 fi
-
 
 disk_status
 color orange "$command"
 yes_or_no "Is this OK?"
 if [[ "$answer" != "y" ]]; then
-	error "ABORTED: user cancelled zfs pool creation"
+    error "ABORTED: user cancelled zfs pool creation"
 fi
 
 #run the command to create the zpool
 if $command; then
-	color green "SUCCESS: zfs pool creation succeeded!"
+    color green "SUCCESS: zfs pool creation succeeded!"
 else
     #retrieve the name of the offending pool(s)
     poolname2=`zpool list | tail -n +2 | cut -d' ' -f1`
-	error "FAILURE: zfs pool creation failed! This may have been caused by an already exsisting pool. Unmount it with \"sudo umount -R /$poolname2/; sudo zpool export $poolname2\" and re-run the script to continue."
+    error "FAILURE: zfs pool creation failed! This may have been caused by an already exsisting pool. Unmount it with \"sudo umount -R /$poolname2/; sudo zpool export $poolname2\" and re-run the script to continue."
 fi
 
 #upgrade and view the status of the pool
