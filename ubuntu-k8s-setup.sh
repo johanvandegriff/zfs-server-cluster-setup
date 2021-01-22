@@ -11,7 +11,12 @@
 
 . `dirname "$0"`/install-common.sh || exit 1
 
-device=$(ip addr | grep -B 3 '[0-9]\+\.[0-9]\+\.[0-9]\+\.[0-9]\+' | grep '^[0-9]:' | grep -v 'lo: ' | awk '{print $2}' | tr -d :)
+devices=$(ip addr | grep -B 3 '[0-9]\+\.[0-9]\+\.[0-9]\+\.[0-9]\+' | grep '^[0-9]:' | grep -v 'lo: ' | awk '{print $2}' | tr -d :)
+echo "pick your ethernet device from the list below (type it and press ENTER):
+$devices"
+read device
+echo "$devices" | grep "$device" || error "Device you entered is not on the list."
+
 mac_addr=$(ip addr show "$device" | grep '..:..:..:..:..:..' | awk '{print $2}')
 uuid=$(cat /sys/class/dmi/id/product_uuid) || error "Error getting uuid. Maybe run this script with sudo?"
 
