@@ -59,13 +59,16 @@ error_ports() {
     error "Error opening port(s): $@"
 }
 
-if [[ "$master" == y ]]; then
-    ufw allow 6443/tcp || error_ports 6443
-    ufw allow 2379:2380/tcp || error_ports 2379:2380
-    ufw allow 10250:10252/tcp || error_ports 10250:10252
-else
-    ufw allow 10250/tcp || error_ports 10250
-    ufw allow 30000:32767/tcp || error_ports 30000:32767
+yes_or_no "Set up firewall with ufw?"
+if [[ "$answer" == y ]]; then
+    if [[ "$master" == y ]]; then
+        ufw allow 6443/tcp || error_ports 6443
+        ufw allow 2379:2380/tcp || error_ports 2379:2380
+        ufw allow 10250:10252/tcp || error_ports 10250:10252
+    else
+        ufw allow 10250/tcp || error_ports 10250
+        ufw allow 30000:32767/tcp || error_ports 30000:32767
+    fi
 fi
 
 color green "Installing kubernetes packages..."
@@ -82,14 +85,19 @@ apt-mark hold kubelet kubeadm kubectl || error "Error telling apt to not automat
 #install docker-ce
 #https://docs.docker.com/install/linux/docker-ce/ubuntu/
 color green "Installing docker-ce..."
+os=ubuntu
+yes_or_no "Are you running debian?"
+if [[ "$answer" == y ]]; then
+  os=debian
+fi
 apt-get update || error "Error with apt update (before installing docker-ce)"
 apt-get install -y apt-transport-https ca-certificates curl gnupg-agent software-properties-common || error "Error installing dependencies for docker-ce"
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add - || error "Error adding docker's gpg key"
+curl -fsSL https://download.docker.com/linux/$os/gpg | apt-key add - || error "Error adding docker's gpg key"
 apt-key fingerprint 0EBFCD88 || error "Error looking for key fingerprint"
 color yellow "Make sure the previous command outputted a matching fingerprint for docker. You can do this by looking up the fingerprint online to verify from multiple sources"
 color green "Press ENTER to continue"
 read a
-add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" || error "Error adding docker repositorty"
+add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/$os $(lsb_release -cs) stable" || error "Error adding docker repositorty"
 apt-get update || error "Error with apt update (during installation of docker-ce)"
 apt-get install -y docker-ce || error "Error installing docker-ce"
 docker run hello-world || error "Error running Hello World docker image"
