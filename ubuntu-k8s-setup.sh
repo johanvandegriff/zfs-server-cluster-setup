@@ -84,7 +84,7 @@ apt-mark hold kubelet kubeadm kubectl || error "Error telling apt to not automat
 color green "Installing docker-ce..."
 apt-get update || error "Error with apt update (before installing docker-ce)"
 apt-get install -y apt-transport-https ca-certificates curl gnupg-agent software-properties-common || error "Error installing dependencies for docker-ce"
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add - || error "Error adding docker's gpg key"
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add - || error "Error adding docker's gpg key"
 apt-key fingerprint 0EBFCD88 || error "Error looking for key fingerprint"
 color yellow "Make sure the previous command outputted a matching fingerprint for docker. You can do this by looking up the fingerprint online to verify from multiple sources"
 color green "Press ENTER to continue"
