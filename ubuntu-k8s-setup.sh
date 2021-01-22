@@ -18,9 +18,11 @@ read device
 echo "$devices" | grep "$device" || error "Device you entered is not on the list."
 
 mac_addr=$(ip addr show "$device" | grep '..:..:..:..:..:..' | awk '{print $2}')
+ip_addr=$(ip addr show "$device" | grep -E "inet ([0-9]{1,3}[\.]){3}[0-9]{1,3}" | tr / ' ' | awk '{print $2}')
 uuid=$(cat /sys/class/dmi/id/product_uuid) || error "Error getting uuid. Maybe run this script with sudo?"
 
 color yellow "Make sure the following info is unique for every node. If this is the first node, you should run this script with the --check option on the other nodes now before proceeding. This will just print out their respective MAC addresses and UUID's without installing anything."
+echo "IP ADDRESS:   $ip_addr"
 echo "MAC ADDRESS:  $mac_addr"
 echo "PRODUCT UUID: $uuid"
 
